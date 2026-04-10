@@ -389,7 +389,12 @@ func relayBidirectional(client, proxy net.Conn, target string, showStats bool) b
 
 			if _, err := proxy.Write(buf[:n]); err != nil {
 				proxyDied = true
-				close(proxyDiedChan)
+				// Safe close - check if already closed :P
+				select {
+				case <-proxyDiedChan:
+				default:
+					close(proxyDiedChan)
+				}
 				break
 			}
 
