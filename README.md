@@ -1,4 +1,4 @@
-# Groid v1.3.1 – Golang Android Proxier
+# Groid – Golang Android Proxier
 
 ## 📦 Usage
 
