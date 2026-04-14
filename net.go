@@ -292,32 +292,33 @@ func getOriginalDst(conn net.Conn) (string, int, error) {
 		return "", 0, fmt.Errorf("not TCP connection")
 	}
 
-	file, err := tcpConn.File()
+	raw, err := tcpConn.SyscallConn()
 	if err != nil {
 		return "", 0, err
 	}
-	defer file.Close()
 
-	fd := int(file.Fd())
-
-	// Query kernel for original destination address
 	var addr syscall.RawSockaddrInet4
 	size := uint32(syscall.SizeofSockaddrInet4)
+	var errno syscall.Errno
 
-	_, _, errno := syscall.RawSyscall6(
-		syscall.SYS_GETSOCKOPT,
-		uintptr(fd),
-		uintptr(syscall.IPPROTO_IP),
-		uintptr(SO_ORIGINAL_DST),
-		uintptr(unsafe.Pointer(&addr)),
-		uintptr(unsafe.Pointer(&size)),
-		0,
-	)
-
+	// Query kernel for original destination address via Control (no fd dup)
+	err = raw.Control(func(fd uintptr) {
+		_, _, errno = syscall.RawSyscall6(
+			syscall.SYS_GETSOCKOPT,
+			fd,
+			uintptr(syscall.IPPROTO_IP),
+			uintptr(SO_ORIGINAL_DST),
+			uintptr(unsafe.Pointer(&addr)),
+			uintptr(unsafe.Pointer(&size)),
+			0,
+		)
+	})
+	if err != nil {
+		return "", 0, err
+	}
 	if errno != 0 {
 		return "", 0, fmt.Errorf("getsockopt failed: %v", errno)
 	}
-
 	// Convert network byte order to host byte order
 	ip := net.IPv4(addr.Addr[0], addr.Addr[1], addr.Addr[2], addr.Addr[3])
 	port := int(addr.Port>>8) | int(addr.Port&0xff)<<8
