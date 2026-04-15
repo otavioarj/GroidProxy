@@ -79,6 +79,13 @@ func handleClient(client net.Conn) {
 	}
 	debugf("New connection to %s:%d", host, port)
 
+	// Unified blacklist check by IP - covers all outbound paths (HTTP, HTTPS, TLS, unknown)
+	// HTTP additionally checks hostname via Host header in handleHTTP
+	if isBlacklisted(host) {
+		debugf("Blocked connection to %s:%d", host, port)
+		return
+	}
+
 	buf := bufPool4K.Get().([]byte)
 	n, err := client.Read(buf)
 	if err != nil {
@@ -137,7 +144,8 @@ func handleHTTPS(client net.Conn, firstData []byte, host string, port int, connT
 // handleHTTP handles plain HTTP requests
 // Supports capture mode and proxy forwarding
 func handleHTTP(client net.Conn, firstData []byte, host string, port int) {
-	// Single blacklist check point for HTTP traffic
+	// Hostname-based blacklist check via Host header
+	// Complements the IP-based check in handleClient (catches domain wildcards like .facebook.com)
 	targetHost := extractHTTPHost(firstData, host)
 	if isBlacklisted(targetHost) || isBlacklisted(host) {
 		debugf("Blocked connection to %s", targetHost)

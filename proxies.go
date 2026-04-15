@@ -88,13 +88,7 @@ func rewriteHTTPAbsolute(data []byte, host string, port int) []byte {
 }
 
 // setupSOCKS5Proxy establishes SOCKS5 connection to target
-// Validates blacklist before handshake to avoid wasted resources
 func setupSOCKS5Proxy(proxy net.Conn, host string, port int) error {
-	// Check blacklist first, before any network I/O
-	if isBlacklisted(host) {
-		return fmt.Errorf("blocked: %s", host)
-	}
-
 	// Handshake: version 5, 1 method, no auth
 	if _, err := proxy.Write([]byte{0x05, 0x01, 0x00}); err != nil {
 		return err
